@@ -35,22 +35,18 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final CustomUserDetailsService userDetailsService;
 
-    // Security filter chain
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
         http
-            // Disable CSRF for stateless JWT authentication
             .csrf(AbstractHttpConfigurer::disable)
 
-            // Enable CORS
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .cors(cors ->
+                cors.configurationSource(corsConfigurationSource()))
 
-            // Stateless session management
             .sessionManagement(sm ->
                 sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-            // Return 401 for unauthenticated requests
             .exceptionHandling(ex ->
                 ex.authenticationEntryPoint(
                     (request, response, authException) ->
@@ -58,10 +54,8 @@ public class SecurityConfig {
                             jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED,
                             "Unauthorized")))
 
-            // Authorization rules
             .authorizeHttpRequests(auth -> auth
-
-                // Allow CORS preflight requests
+                // Allow browser CORS preflight requests
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                 // Public product browsing
@@ -76,14 +70,12 @@ public class SecurityConfig {
                 // Admin-only endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
-                // All remaining endpoints require authentication
+                // All other endpoints require authentication
                 .anyRequest().authenticated()
             )
 
-            // Authentication provider
             .authenticationProvider(authenticationProvider())
 
-            // JWT authentication filter
             .addFilterBefore(
                 jwtAuthenticationFilter,
                 UsernamePasswordAuthenticationFilter.class
@@ -92,39 +84,51 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // CORS configuration
     @Bean
-public CorsConfigurationSource corsConfigurationSource() {
-    CorsConfiguration config = new CorsConfiguration();
+    public CorsConfigurationSource corsConfigurationSource() {
 
-    config.setAllowedOrigins(List.of(
-        "http://localhost:5173",
-        "http://localhost:5178"
-    ));
+        CorsConfiguration config = new CorsConfiguration();
 
-    config.setAllowedMethods(List.of(
-        "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
-    ));
+        // Deployed frontend and local development origins
+        config.setAllowedOrigins(List.of(
+            "https://revendo-frontend.vercel.app",
+            "http://localhost:5173",
+            "http://localhost:5178"
+        ));
 
-    config.setAllowedHeaders(List.of("*"));
-    config.setAllowCredentials(true);
-    config.setMaxAge(3600L);
+        config.setAllowedMethods(List.of(
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "PATCH",
+            "OPTIONS"
+        ));
 
-    UrlBasedCorsConfigurationSource source =
+        config.setAllowedHeaders(List.of(
+            "Authorization",
+            "Content-Type",
+            "Accept",
+            "Origin",
+            "X-Requested-With"
+        ));
+
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source =
             new UrlBasedCorsConfigurationSource();
 
-    source.registerCorsConfiguration("/**", config);
+        source.registerCorsConfiguration("/**", config);
 
-    return source;
-}
+        return source;
+    }
 
-    // Password encoder
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // Authentication provider
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
 
@@ -137,7 +141,6 @@ public CorsConfigurationSource corsConfigurationSource() {
         return provider;
     }
 
-    // Authentication manager
     @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration config) throws Exception {
