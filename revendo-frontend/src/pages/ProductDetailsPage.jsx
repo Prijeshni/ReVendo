@@ -10,7 +10,7 @@ import messagingService from '../services/messagingService';
 import { formatDate } from '../utils/formatters';
 
 // Backend base URL for images served at /images/**
-const BACKEND = 'http://localhost:8080';
+const BACKEND = 'http://localhost:8090';
 
 /** Prefix relative image paths (/images/…) with the backend URL. */
 const toAbsoluteUrl = (url) => {

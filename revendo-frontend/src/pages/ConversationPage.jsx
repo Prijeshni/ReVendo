@@ -21,16 +21,38 @@ function ConversationPage() {
 
   const endRef = useRef(null);
 
+  // Identify the logged-in user.
+  const currentUserId =
+    currentUser?.userId ??
+    currentUser?.id ??
+    currentUser?.studentId ??
+    currentUser?.user?.id ??
+    null;
+
+  // Load conversation messages.
   const loadMessages = useCallback(async () => {
     setLoading(true);
+    setError(null);
 
     try {
       const res = await messagingService.getMessages(conversationId);
-      setMessages(res.data || []);
+      const data = res.data;
+
+      const fetchedMessages = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.content)
+          ? data.content
+          : Array.isArray(data?.messages)
+            ? data.messages
+            : [];
+
+      setMessages(fetchedMessages);
+
       await messagingService.markAsRead(conversationId);
     } catch (err) {
       setError(
-        err.response?.data?.message || 'Could not load messages.'
+        err.response?.data?.message ||
+          'Could not load messages. Please try again.'
       );
     } finally {
       setLoading(false);
@@ -46,24 +68,31 @@ function ConversationPage() {
     loadMessages();
   }, [loadMessages, currentUser, navigate]);
 
+  // Scroll to the latest message.
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Send a message.
   const handleSend = async (e) => {
     e.preventDefault();
 
-    if (!text.trim()) return;
+    const messageText = text.trim();
+
+    if (!messageText || sending) return;
 
     setSending(true);
 
     try {
       const res = await messagingService.sendMessage(
         conversationId,
-        text.trim()
+        messageText
       );
 
-      setMessages((prev) => [...prev, res.data]);
+      if (res.data) {
+        setMessages((prev) => [...prev, res.data]);
+      }
+
       setText('');
     } catch (err) {
       showToast(
@@ -87,6 +116,15 @@ function ConversationPage() {
     return (
       <div className="container py-5 text-center">
         <div className="alert alert-warning">{error}</div>
+
+        <button
+          type="button"
+          className="btn btn-primary me-2"
+          onClick={loadMessages}
+        >
+          Retry
+        </button>
+
         <Link to="/messages" className="btn btn-outline-primary">
           Back to Messages
         </Link>
@@ -143,6 +181,7 @@ function ConversationPage() {
         style={{
           flex: 1,
           overflowY: 'auto',
+          width: '100%',
           maxWidth: 700,
         }}
       >
@@ -153,28 +192,50 @@ function ConversationPage() {
           </div>
         ) : (
           messages.map((m, i) => {
+            const senderId =
+              m.senderId ??
+              m.sender?.userId ??
+              m.sender?.id ??
+              m.sender?.studentId ??
+              m.sender?.user?.id ??
+              null;
+
             const isMe =
-              String(m.senderId) === String(currentUser?.userId);
+              currentUserId != null &&
+              senderId != null &&
+              String(senderId) === String(currentUserId);
+
+            const senderName =
+              m.senderDisplayName ??
+              m.senderName ??
+              m.sender?.displayName ??
+              m.sender?.name ??
+              'User';
 
             return (
               <div
-                key={i}
+                key={m.id ?? m.messageId ?? i}
                 style={{
                   display: 'flex',
                   justifyContent: isMe ? 'flex-end' : 'flex-start',
-                  marginBottom: 8,
+                  width: '100%',
+                  marginBottom: 10,
                 }}
               >
                 <div
                   style={{
                     maxWidth: '75%',
+                    minWidth: 80,
                     padding: '10px 14px',
-                    borderRadius: 12,
+                    borderRadius: isMe
+                      ? '14px 14px 3px 14px'
+                      : '14px 14px 14px 3px',
                     background: isMe ? 'var(--rv-accent)' : '#fff',
                     color: isMe ? '#fff' : 'var(--rv-text)',
                     border: isMe
                       ? 'none'
                       : '1px solid var(--rv-border)',
+                    overflowWrap: 'anywhere',
                   }}
                 >
                   {!isMe && (
@@ -183,10 +244,10 @@ function ConversationPage() {
                         fontSize: '0.72rem',
                         fontWeight: 700,
                         color: 'var(--rv-accent)',
-                        marginBottom: 2,
+                        marginBottom: 4,
                       }}
                     >
-                      {m.senderDisplayName}
+                      {senderName}
                     </div>
                   )}
 
@@ -196,17 +257,18 @@ function ConversationPage() {
                       whiteSpace: 'pre-wrap',
                     }}
                   >
-                    {m.text}
+                    {m.text ?? m.content ?? ''}
                   </div>
 
                   <div
                     style={{
                       fontSize: '0.68rem',
-                      opacity: 0.6,
-                      marginTop: 4,
+                      opacity: 0.7,
+                      marginTop: 5,
+                      textAlign: 'right',
                     }}
                   >
-                    {formatDate(m.sentAt)}
+                    {m.sentAt ? formatDate(m.sentAt) : ''}
                   </div>
                 </div>
               </div>
@@ -230,11 +292,12 @@ function ConversationPage() {
             <input
               type="text"
               className="form-control"
-              placeholder="Type a message…"
+              placeholder="Type a message..."
               maxLength={2000}
               value={text}
               onChange={(e) => setText(e.target.value)}
               disabled={sending}
+              aria-label="Message text"
             />
 
             <button

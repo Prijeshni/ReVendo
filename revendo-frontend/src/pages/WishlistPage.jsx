@@ -6,7 +6,7 @@ import useToast from '../hooks/useToast';
 import wishlistService from '../services/wishlistService';
 import { formatCurrency } from '../utils/formatters';
 
-const BACKEND = 'http://localhost:8080';
+const BACKEND = 'http://localhost:8090';
 const toAbs = (url) => (!url ? '' : url.startsWith('http') ? url : `${BACKEND}${url}`);
 
 function WishlistPage() {
