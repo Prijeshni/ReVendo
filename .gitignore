@@ -1,0 +1,28 @@
+# React / Node
+node_modules/
+dist/
+.vite/
+
+# Java / Maven
+target/
+*.class
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+
+# Generated property-testing database
+revendo-backend/.jqwik-database
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
