@@ -3,11 +3,15 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 import wishlistService from '../../services/wishlistService';
+import { getImageUrl } from '../../utils/imageUrl';
 
 /** Format a number as Indian Rupees */
 const formatINR = (amount) => {
   const num = parseFloat(amount);
-  if (isNaN(num)) return '₹0';
+
+  if (isNaN(num)) {
+    return '₹0';
+  }
 
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -17,11 +21,14 @@ const formatINR = (amount) => {
 };
 
 const CONDITION_BADGE = {
-  New:      { cls: 'badge-condition-new', label: '✨ New' },
-  'Like New': { cls: 'badge-condition-like-new', label: '👍 Like New' },
-  Good:     { cls: 'badge-condition-good', label: '👌 Good' },
-  Fair:     { cls: 'badge-condition-fair', label: '🔧 Fair' },
-  Poor:     { cls: 'badge-condition-poor', label: '⚠️ Poor' },
+  New: { cls: 'badge-condition-new', label: '✨ New' },
+  'Like New': {
+    cls: 'badge-condition-like-new',
+    label: '👍 Like New',
+  },
+  Good: { cls: 'badge-condition-good', label: '👌 Good' },
+  Fair: { cls: 'badge-condition-fair', label: '🔧 Fair' },
+  Poor: { cls: 'badge-condition-poor', label: '⚠️ Poor' },
 };
 
 const TYPE_LABEL = {
@@ -38,29 +45,8 @@ const CAT_ICONS = {
 };
 
 /**
- * Convert an image path returned by the backend into a usable URL.
- * Works for both existing and newly uploaded product images.
- */
-const getImageUrl = (imageUrl) => {
-  if (!imageUrl) return '';
-
-  // Preserve absolute URLs.
-  if (/^https?:\/\//i.test(imageUrl)) {
-    return imageUrl;
-  }
-
-  // Relative image paths must point to the Render backend,
-  // not the Vercel frontend.
-  const backendUrl = 'https://revendo-backend.onrender.com';
-  const normalizedPath = imageUrl.startsWith('/')
-    ? imageUrl
-    : `/${imageUrl}`;
-
-  return `${backendUrl}${normalizedPath}`;
-};
-
-/**
  * Reusable product card.
+ * Supports absolute URLs and relative image paths returned by the backend.
  */
 function ProductCard({
   listing,
@@ -84,13 +70,23 @@ function ProductCard({
 
   const [wishlisted, setWishlisted] = useState(!!wishedProp);
   const [wlLoading, setWlLoading] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
 
   const cond = CONDITION_BADGE[condition] || {
     cls: '',
-    label: condition,
+    label: condition || 'Condition not specified',
   };
 
   const isSold = status === 'Sold' || status === 'Rented';
+
+  // Use the first valid image URL.
+  const firstImage = Array.isArray(imageUrls)
+    ? imageUrls.find(
+        (url) => typeof url === 'string' && url.trim() !== ''
+      )
+    : null;
+
+  const imageSrc = firstImage ? getImageUrl(firstImage) : '';
 
   const handleWishlist = async (e) => {
     e.preventDefault();
@@ -124,10 +120,13 @@ function ProductCard({
     <div className="product-card" style={{ position: 'relative' }}>
       {/* Wishlist button */}
       <button
+        type="button"
         onClick={handleWishlist}
         disabled={wlLoading}
         title={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-        aria-label={wishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+        aria-label={
+          wishlisted ? 'Remove from wishlist' : 'Add to wishlist'
+        }
         style={{
           position: 'absolute',
           top: 10,
@@ -157,32 +156,33 @@ function ProductCard({
       </button>
 
       {/* Product image */}
-      {imageUrls.length > 0 ? (
+      {imageSrc && !imageFailed ? (
         <img
-          src={getImageUrl(imageUrls[0])}
-          alt={title}
+          src={imageSrc}
+          alt={title || 'Product image'}
           className="card-img-top"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none';
-
-            const placeholder = e.currentTarget.nextElementSibling;
-            if (placeholder) {
-              placeholder.style.display = 'flex';
-            }
+          loading="lazy"
+          onError={() => {
+            console.error('Failed to load product image:', imageSrc);
+            setImageFailed(true);
           }}
         />
       ) : null}
 
       {/* Image placeholder */}
-      <div
-        className="img-placeholder"
-        style={{
-          display: imageUrls.length > 0 ? 'none' : 'flex',
-        }}
-        aria-hidden="true"
-      >
-        {CAT_ICONS[category] || '🖼️'}
-      </div>
+      {(!imageSrc || imageFailed) && (
+        <div
+          className="img-placeholder"
+          aria-label="Product image unavailable"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {CAT_ICONS[category] || '🖼️'}
+        </div>
+      )}
 
       {/* Sold / Rented badge */}
       {isSold && (
@@ -211,7 +211,7 @@ function ProductCard({
                 color: 'var(--rv-text-muted)',
               }}
             >
-              {CAT_ICONS[category]} {category}
+              {CAT_ICONS[category] || '🛍️'} {category}
             </span>
           )}
 
@@ -263,9 +263,7 @@ function ProductCard({
         {/* Price and product details */}
         <div className="card-footer-area d-flex justify-content-between align-items-center">
           <div>
-            <span className="card-price">
-              {formatINR(price)}
-            </span>
+            <span className="card-price">{formatINR(price)}</span>
 
             {listingType === 'FOR_RENT' && (
               <small

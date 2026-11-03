@@ -70,9 +70,12 @@ public class MessagingService {
         Long sellerId = listing.getSeller().getId();
 
         // Buyer must not be the seller
+        // Buyer must not be the seller
         if (buyerId.equals(sellerId)) {
-            throw new UnauthorizedException(
-                    "You cannot start a conversation about your own listing.");
+                throw new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.FORBIDDEN,
+                        "You cannot start a conversation about your own listing."
+                );
         }
 
         User buyer = userRepository.findById(buyerId)
